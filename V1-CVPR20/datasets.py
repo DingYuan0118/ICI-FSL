@@ -10,32 +10,27 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from torchvision.transforms import Compose, Normalize, Resize, ToTensor
-
+import json
 
 class DataSet(Dataset):
 
     def __init__(self, data_root, setname, img_size):
         self.img_size = img_size
-        csv_path = osp.join(data_root, setname + '.csv')
-        lines = [x.strip() for x in open(csv_path, 'r').readlines()][1:]
+        if setname in ["test", "novel_all", "val"]:
+            json_path = osp.join(data_root, setname + '.json') # 当测试数据集与源数据集不一致时使用
+        elif setname == "train":
+            json_path = osp.join(data_root, 'base.json')
+        with open(json_path, "r") as f:
+            self.meta = json.load(f) # json file(dict) ： {"label_names:[...], "image_names":[...], "image_labels":[...]}
 
-        data = []
-        label = []
-        lb = -1
+        data = self.meta["image_names"]
+        label = self.meta["image_labels"] # dataset 返回的label并无实际作用,只是当做一个类别标识
 
-        self.wnids = []
+        self.data = data  # data path of all data
+        self.label = label  # label of all data
+        self.num_class = len(set(label))
+        self.wnids = self.meta["label_names"]
 
-        for l in lines:
-            name, wnid = l.split(',')
-            path = osp.join(data_root, 'images', name)
-            if wnid not in self.wnids:
-                self.wnids.append(wnid)
-                lb += 1
-            data.append(path)
-            label.append(lb)
-
-        self.data = data
-        self.label = label
         if setname=='test' or setname=='val':
             self.transform = transforms.Compose([
                                                transforms.Resize((img_size, img_size)),
