@@ -45,7 +45,6 @@ def train_embedding(args):
     best_acc = 0.0
     for epoch in range(120):
         model.train()
-        scheduler.step(epoch)
         loss_list = []
         train_acc_list = []
         for images, labels in tqdm(source_loader, ncols=0):
@@ -57,13 +56,15 @@ def train_embedding(args):
             loss_list.append(loss.item())
             train_acc_list.append(preds.max(1)[1].cpu().eq(
                 labels).float().mean().item())
+        scheduler.step()
         acc = []
         model.eval()
-        for images, labels in test_loader:
-            preds = model(images.to(args.device)).detach().cpu()
-            preds = torch.argmax(preds, 1).reshape(-1)
-            labels = labels.reshape(-1)
-            acc += (preds==labels).tolist()
+        with torch.no_grad():
+            for images, labels in test_loader:
+                preds = model(images.to(args.device)).detach().cpu()
+                preds = torch.argmax(preds, 1).reshape(-1)
+                labels = labels.reshape(-1)
+                acc += (preds==labels).tolist()
         acc = np.mean(acc)
         print('Epoch:{} Train-loss:{} Train-acc:{} Valid-acc:{}'.format(epoch, str(np.mean(loss_list))[:6], str(
             np.mean(train_acc_list))[:6], str(acc)[:6]))

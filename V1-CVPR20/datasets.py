@@ -6,6 +6,7 @@ import collections
 
 import numpy as np
 import PIL.Image as Image
+from numpy.core.fromnumeric import sort
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -97,18 +98,30 @@ class CategoriesSampler():
 filenameToPILImage = lambda x: Image.open(x).convert('RGB')
 
 def loadSplit(splitFile):
-            dictLabels = {}
-            with open(splitFile) as csvfile:
-                csvreader = csv.reader(csvfile, delimiter=',')
-                next(csvreader, None)
-                for i,row in enumerate(csvreader):
-                    filename = row[0]
-                    label = row[1]
-                    if label in dictLabels.keys():
-                        dictLabels[label].append(filename)
-                    else:
-                        dictLabels[label] = [filename]
-            return dictLabels
+    dictLabels = {}
+    with open(splitFile) as csvfile:
+        csvreader = csv.reader(csvfile, delimiter=',')
+        next(csvreader, None)
+        for i,row in enumerate(csvreader):
+            filename = row[0]
+            label = row[1]
+            if label in dictLabels.keys():
+                dictLabels[label].append(filename)
+            else:
+                dictLabels[label] = [filename]
+    return dictLabels
+
+def loadSplitFromJson(splitFile):
+    dictLabels = {}
+    with open(splitFile) as f:
+        meta = json.load(f)
+        for filename, j in zip(meta["image_names"], meta["image_labels"]):
+            label = meta["label_names"][j]
+            if label in dictLabels.keys():
+                dictLabels[label].append(filename)
+            else:
+                dictLabels[label] = [filename]
+    return dictLabels
 
 
 class EmbeddingDataset(Dataset):
@@ -134,8 +147,10 @@ class EmbeddingDataset(Dataset):
 
         
         self.ImagesDir = os.path.join(dataroot,'images')
-        self.data = loadSplit(splitFile = os.path.join(dataroot,'train' + '.csv'))
-
+        # self.data = loadSplit(splitFile = os.path.join(dataroot,'train' + '.csv'))
+        self.data = loadSplitFromJson(splitFile = os.path.join(dataroot,'base' + '.json'))
+        for i,j in self.data.items():
+            j.sort()
         self.data = collections.OrderedDict(sorted(self.data.items()))
         keys = list(self.data.keys())
         self.classes_dict = {keys[i]:i  for i in range(len(keys))} # map NLabel to id(0-99)
@@ -163,7 +178,8 @@ class EmbeddingDataset(Dataset):
         c = self.belong[index]
         File = self.Files[index]
 
-        path = os.path.join(self.ImagesDir,str(File))
+        # path = os.path.join(self.ImagesDir,str(File))
+        path = str(File)
         try:
             images = self.transform(path)
         except RuntimeError:
